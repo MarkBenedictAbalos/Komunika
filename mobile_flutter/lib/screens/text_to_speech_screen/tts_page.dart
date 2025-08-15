@@ -52,26 +52,25 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
       "image": "assets/flags/us_male.png",
       "label": "US - MALE",
       "language": "en-US",
-      "voice":
-          "en-us-x-sfg#male_1-local", // Example, use actual voice name from flutterTts.getVoices
+      "voice": "en-us-x-tpf-local",
     },
     {
       "image": "assets/flags/us_female.png",
       "label": "US - FEMALE",
       "language": "en-US",
-      "voice": "en-us-x-sfg#female_1-local",
+      "voice": "en-us-x-sfg-local",
     },
     {
       "image": "assets/flags/ph_male.png",
       "label": "PH - MALE",
       "language": "fil-PH",
-      "voice": "fil-ph-x-fia-local",
+      "voice": "fil-ph-x-fie-local",
     },
     {
       "image": "assets/flags/ph_female.png",
       "label": "PH - FEMALE",
       "language": "fil-PH",
-      "voice": "fil-ph-x-fib-local",
+      "voice": "fil-ph-x-fic-local",
     },
   ];
 
@@ -87,6 +86,9 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
   Future<void> _initialize() async {
     widget.ttsBloc.add(TextToSpeechLoadingEvent());
     ttsSettings = await PreferencesUtils.getTTSSettings();
+
+    selectedVoice = await PreferencesUtils.getTTSVoice();
+    rate = await PreferencesUtils.getTTSRate();
   }
 
   Future<void> _initTts() async {
@@ -147,11 +149,18 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
     await flutterTts.setSpeechRate(rate);
     await flutterTts.setPitch(1.0);
 
+    List<dynamic> filipinoVoices = voices
+        .where((voice) =>
+            voice["locale"].toString().toLowerCase().contains("en-us"))
+        .toList();
+
+    print("Available US Voices: $filipinoVoices");
+
     if (language != null) {
       await flutterTts.setLanguage(language!);
     }
     if (selectedVoice != null) {
-      await flutterTts.setVoice({"name": selectedVoice!});
+      await flutterTts.setVoice({"name": selectedVoice!, "locale": language!});
     }
 
     await flutterTts.speak(text);
@@ -299,6 +308,7 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
                 await showDialog(
                   context: context,
                   builder: (context) => Dialog(
+                    backgroundColor: themeProvider.themeData.cardColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -311,14 +321,14 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: _voiceOptions.sublist(0, 2).map((option) {
-                              return _buildVoiceOption(option);
+                              return _buildVoiceOption(option, themeProvider);
                             }).toList(),
                           ),
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: _voiceOptions.sublist(2, 4).map((option) {
-                              return _buildVoiceOption(option);
+                              return _buildVoiceOption(option, themeProvider);
                             }).toList(),
                           ),
                         ],
@@ -348,7 +358,7 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
         SizedBox(width: ResponsiveUtils.getResponsiveSize(context, 20)),
 
         _buildControlButton(
-          label: "${rate.toStringAsFixed(2)}x",
+          label: "${(rate + 0.50).toStringAsFixed(2)}x",
           backgroundColor: themeProvider.themeData.cardColor,
           textColor: themeProvider.themeData.textTheme.bodyMedium?.color,
           height: 50,
@@ -357,6 +367,7 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
             await showDialog(
               context: context,
               builder: (context) => Dialog(
+                backgroundColor: themeProvider.themeData.cardColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -368,13 +379,28 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
                     itemCount: _rateOptions.length,
                     itemBuilder: (context, index) {
                       final option = _rateOptions[index];
+                      final isSelected = rate == option;
                       return ListTile(
-                        title: Text("${option.toStringAsFixed(2)}x"),
-                        selected: rate == option,
+                        title: Text(
+                          "${(option + 0.50).toStringAsFixed(2)}x",
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.blue
+                                : themeProvider
+                                    .themeData.textTheme.bodyMedium?.color,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        tileColor:
+                            isSelected ? Colors.blue.withOpacity(0.15) : null,
+                        selected: isSelected,
                         onTap: () {
                           setState(() {
                             rate = option;
                           });
+                          PreferencesUtils.storeTTSRate(option);
                           Navigator.pop(context);
                         },
                       );
@@ -390,7 +416,8 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
     );
   }
 
-  Widget _buildVoiceOption(Map<String, String> option) {
+  Widget _buildVoiceOption(
+      Map<String, String> option, ThemeProvider themeProvider) {
     final isSelected = selectedVoice == option["voice"];
     return GestureDetector(
       onTap: () async {
@@ -398,6 +425,7 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
           language = option["language"];
           selectedVoice = option["voice"];
         });
+        await PreferencesUtils.storeTTSVoice(option["voice"]!);
         await flutterTts.setLanguage(option["language"]!);
         await flutterTts.setVoice({"name": option["voice"]!});
         Navigator.pop(context);
@@ -422,7 +450,9 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
             option["label"]!,
             style: TextStyle(
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? Colors.blue : Colors.black,
+              color: isSelected
+                  ? Colors.blue
+                  : themeProvider.themeData.textTheme.bodyMedium?.color,
             ),
           ),
         ],
@@ -580,7 +610,8 @@ class _TextToSpeechScreenState extends State<TextToSpeechScreen> {
     }
   }
 
-  Future<void> _extractTextFromImage(String imagePath, ThemeProvider themeProvider) async {
+  Future<void> _extractTextFromImage(
+      String imagePath, ThemeProvider themeProvider) async {
     showDialog(
       context: context,
       barrierDismissible: false,

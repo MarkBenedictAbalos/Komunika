@@ -124,4 +124,25 @@ class PreferencesUtils {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getInt('isDenoiseLevel') ?? -10;
   }
+
+  static Future<void> storeTTSVoice(String voice) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("TTS_selectedVoice", voice);
+  }
+
+  static Future<String> getTTSVoice() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString("TTS_selectedVoice") ??
+        "fil-ph-x-fie-local"; // default voice
+  }
+
+  static Future<void> storeTTSRate(double rate) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble("TTS_selectedRate", rate);
+  }
+
+  static Future<double> getTTSRate() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble("TTS_selectedRate") ?? 0.5; // default rate
+  }
 }
